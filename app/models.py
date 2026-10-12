@@ -168,6 +168,8 @@ class Feed(Base):
     autoclean_mode = Column(String, nullable=True)  # "recent" | "unplayed"; None = inherit global
     # When True, this feed is skipped by the global scheduled autoclean job
     autoclean_exclude = Column(Boolean, default=False, nullable=True)
+    # When True, marking an episode played deletes its server-side audio file.
+    auto_delete_played = Column(Boolean, default=False, nullable=True)
 
     # How "Play" treats this feed.  None/'newest' = start with the newest
     # unplayed episode (ordinary podcast).  'oldest' = listen in order: resume
@@ -253,10 +255,12 @@ class Playlist(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    # 'feed' playlists are computed live; 'custom' playlists use PlaylistEpisode rows
-    type = Column(String, nullable=False)          # 'feed' | 'custom'
+    # 'feed' and 'smart' playlists are computed live; 'custom' playlists use PlaylistEpisode rows
+    type = Column(String, nullable=False)          # 'feed' | 'custom' | 'smart'
     feed_id = Column(Integer, ForeignKey("feeds.id", ondelete="CASCADE"), nullable=True)
     filter = Column(String, default="unplayed")    # 'all' | 'unplayed' (feed playlists only)
+    smart_config = Column(JSON, nullable=True)
+    smart_key = Column(String, nullable=True, unique=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     episodes = relationship("PlaylistEpisode", back_populates="playlist",

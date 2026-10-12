@@ -578,6 +578,15 @@ def delete_file(episode_id: int, db: Session = Depends(get_db)):
     )
     if not ep:
         raise HTTPException(status_code=404, detail="Episode not found")
+    _delete_episode_file(ep)
+    db.commit()
+    db.refresh(ep)
+    log.info("File deleted for episode: '%s' (ep %d)", ep.title or "Untitled", episode_id)
+    return _ep_out(ep)
+
+
+def _delete_episode_file(ep: Episode) -> bool:
+    had_file = bool(ep.file_path)
     if ep.file_path and os.path.exists(ep.file_path):
         os.remove(ep.file_path)
         base = os.path.splitext(ep.file_path)[0]
@@ -591,10 +600,7 @@ def delete_file(episode_id: int, db: Session = Depends(get_db)):
     ep.file_size = None
     ep.download_date = None
     ep.download_progress = 0
-    db.commit()
-    db.refresh(ep)
-    log.info("File deleted for episode: '%s' (ep %d)", ep.title or "Untitled", episode_id)
-    return _ep_out(ep)
+    return had_file
 
 
 class SetNumberBody(BaseModel):
@@ -814,6 +820,8 @@ def toggle_played(episode_id: int, body: PlayedBody | None = None, db: Session =
         if ep.duration:
             from app.routers.stats import _parse_seconds
             ep.play_position_seconds = _parse_seconds(ep.duration)
+        if ep.feed and ep.feed.auto_delete_played:
+            _delete_episode_file(ep)
     else:
         ep.play_position_seconds = 0
     db.commit()
@@ -952,18 +960,7 @@ def bulk_action(body: BulkBody, db: Session = Depends(get_db)):
 
     elif action == "delete_file":
         for ep in episodes:
-            if ep.file_path and os.path.exists(ep.file_path):
-                os.remove(ep.file_path)
-                base = os.path.splitext(ep.file_path)[0]
-                for ext in (".xml", ".jpg", ".png", ".webp"):
-                    sidecar = (ep.file_path + ext) if ext == ".xml" else (base + ext)
-                    if os.path.exists(sidecar):
-                        os.remove(sidecar)
-            ep.status = "pending"
-            ep.file_path = None
-            ep.file_size = None
-            ep.download_date = None
-            ep.download_progress = 0
+            _delete_episode_file(ep)
             affected += 1
         db.commit()
 
@@ -993,6 +990,8 @@ def bulk_action(body: BulkBody, db: Session = Depends(get_db)):
         for ep in episodes:
             ep.played = True
             ep.last_played_at = datetime.utcnow()
+            if ep.feed and ep.feed.auto_delete_played:
+                _delete_episode_file(ep)
             affected += 1
         db.commit()
 

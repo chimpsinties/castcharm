@@ -124,10 +124,13 @@ def _migrate_db():
         ("feeds",           "autoclean_enabled",             "BOOLEAN DEFAULT 0"),
         ("feeds",           "autoclean_mode",                "VARCHAR"),
         ("feeds",           "autoclean_exclude",             "BOOLEAN DEFAULT 0"),
+        ("feeds",           "auto_delete_played",            "BOOLEAN DEFAULT 0"),
         ("feeds",           "play_order",                    "VARCHAR"),
         ("global_settings", "sync_lookback_limit",           "INTEGER DEFAULT 50"),
         ("episodes",        "imported",                      "BOOLEAN DEFAULT 0"),
         ("playlists",       "description",                   "TEXT"),
+        ("playlists",       "smart_config",                  "JSON"),
+        ("playlists",       "smart_key",                     "VARCHAR"),
         # On by default. Safe on upgrade because an existing install has no API
         # keys, and the gate is "enabled AND valid key" — so this alone opens
         # nothing. Being on is what lets a native client enrol itself later.
@@ -147,6 +150,8 @@ def _migrate_db():
             type VARCHAR NOT NULL,
             feed_id INTEGER REFERENCES feeds(id) ON DELETE CASCADE,
             filter VARCHAR DEFAULT 'unplayed',
+            smart_config JSON,
+            smart_key VARCHAR UNIQUE,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )""",
         """CREATE TABLE IF NOT EXISTS playlist_episodes (
@@ -242,6 +247,7 @@ def _migrate_db():
             # own. Small today, but it grows with every episode added to a playlist.
             "CREATE INDEX IF NOT EXISTS ix_playlist_episodes_playlist ON playlist_episodes (playlist_id, position)",
             "CREATE INDEX IF NOT EXISTS ix_playlist_episodes_episode  ON playlist_episodes (episode_id)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_playlists_smart_key ON playlists (smart_key)",
             "CREATE INDEX IF NOT EXISTS ix_feeds_primary_feed_id   ON feeds    (primary_feed_id)",
             "CREATE INDEX IF NOT EXISTS ix_api_keys_key_hash       ON api_keys (key_hash)",
         ]

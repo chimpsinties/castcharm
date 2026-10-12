@@ -20,6 +20,7 @@ _SETTINGS_KEYS = (
     "save_xml",
     "check_interval",
     "auto_download_new",
+    "auto_delete_played",
 )
 
 

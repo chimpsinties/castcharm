@@ -95,12 +95,14 @@ def _ensure_default_settings():
     """Create default GlobalSettings row if it doesn't exist."""
     from app.models import GlobalSettings
     from app.routers.settings import DEFAULT_ID3_MAPPING
+    from app.routers.playlists import ensure_default_smart_playlists
 
     db = SessionLocal()
     try:
         if not db.query(GlobalSettings).first():
             db.add(GlobalSettings(default_id3_mapping=DEFAULT_ID3_MAPPING))
             db.commit()
+        ensure_default_smart_playlists(db)
     finally:
         db.close()
 

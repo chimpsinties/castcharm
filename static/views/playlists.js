@@ -35,6 +35,12 @@ async function _loadPlaylists() {
     container.querySelectorAll("[data-action='delete-playlist']").forEach((btn) => {
       btn.addEventListener("click", () => _deletePlaylist(Number(btn.dataset.id), btn.dataset.name));
     });
+    container.querySelectorAll("[data-action='edit-filters']").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const pl = playlists.find((p) => p.id === Number(btn.dataset.id));
+        if (pl) await _showEditDialog(pl, _loadPlaylists);
+      });
+    });
   } catch (e) {
     container.innerHTML = `<p style="color:var(--error)">${escHTML(e.message)}</p>`;
   }
@@ -42,35 +48,98 @@ async function _loadPlaylists() {
 
 function _playlistCard(pl) {
   const count = pl.episode_count;
-  const typeLabel = pl.type === "feed"
-    ? `Feed · ${pl.filter === "unplayed" ? "Unplayed only" : "All episodes"}`
-    : "Custom playlist";
+  const typeLabel = _playlistTypeLabel(pl);
   const countLabel = `${count} episode${count !== 1 ? "s" : ""}`;
+  const smartCriteria = pl.type === "smart" ? _smartCriteriaHTML(pl.smart_config, { compact: true }) : "";
+  const smartFilterButton = pl.type === "smart"
+    ? `<button class="btn btn-ghost btn-sm" data-action="edit-filters" data-id="${pl.id}">Filters</button>`
+    : "";
   return `
     <div class="playlist-card">
       <div class="playlist-card-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22">
-          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
-          <circle cx="3.5" cy="6" r="1.5" fill="currentColor" stroke="none"/>
-          <circle cx="3.5" cy="12" r="1.5" fill="currentColor" stroke="none"/>
-          <circle cx="3.5" cy="18" r="1.5" fill="currentColor" stroke="none"/>
-        </svg>
+        ${_playlistIconSvg(pl, 22)}
       </div>
       <div class="playlist-card-info">
-        <div class="playlist-card-name">${escHTML(pl.name)}</div>
+        <div class="playlist-card-name" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span>${escHTML(pl.name)}</span>
+          ${_playlistBadgeHTML(pl)}
+        </div>
         ${pl.description ? `<div class="playlist-card-desc">${escHTML(pl.description)}</div>` : ""}
         <div class="playlist-card-meta">${typeLabel} · ${countLabel}</div>
+        ${smartCriteria}
       </div>
       <div class="playlist-card-actions">
         <button class="btn btn-primary btn-sm" data-action="play-playlist" data-id="${pl.id}" title="Play">
           <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           Play
         </button>
+        ${smartFilterButton}
         <a class="btn btn-ghost btn-sm" href="#/playlists/${pl.id}">View</a>
         <button class="btn btn-ghost btn-sm" style="color:var(--error)" data-action="delete-playlist"
                 data-id="${pl.id}" data-name="${escHTML(pl.name)}">Delete</button>
       </div>
     </div>`;
+}
+
+function _playlistTypeLabel(pl) {
+  if (pl.type === "feed") return `Feed · ${pl.filter === "unplayed" ? "Unplayed only" : "All episodes"}`;
+  if (pl.type === "smart") return "Smart list";
+  return "Custom playlist";
+}
+
+function _playlistIconSvg(pl, size = 22) {
+  if (pl.type === "smart") {
+    return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="${size}" height="${size}">
+      <path d="M4 5h16"/><path d="M7 12h10"/><path d="M10 19h4"/>
+      <path d="M6 5l5 7v5l2 1v-6l5-7"/>
+      ${pl.smart_key === "new_releases" ? `<path d="M18 3v4"/><path d="M16 5h4"/>` : ""}
+    </svg>`;
+  }
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="${size}" height="${size}">
+    <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+    <circle cx="3.5" cy="6" r="1.5" fill="currentColor" stroke="none"/>
+    <circle cx="3.5" cy="12" r="1.5" fill="currentColor" stroke="none"/>
+    <circle cx="3.5" cy="18" r="1.5" fill="currentColor" stroke="none"/>
+  </svg>`;
+}
+
+function _playlistBadgeHTML(pl) {
+  if (pl.type !== "smart") return "";
+  const label = "Smart";
+  return `<span title="Smart list" style="display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border);border-radius:999px;padding:2px 7px;font-size:11px;font-weight:700;color:var(--text-2);background:var(--surface-2)">
+    ${_playlistIconSvg(pl, 13)} ${label}
+  </span>`;
+}
+
+function _smartSummary(config) {
+  const cfg = config || {};
+  const sort = cfg.sort === "asc" ? "oldest first" : "newest first";
+  const days = cfg.release_days == null ? "any date" : `last ${cfg.release_days} days`;
+  const dl = cfg.download_status === "any" ? "any download state" : cfg.download_status || "downloaded";
+  const ep = cfg.episode_status === "all" || !cfg.episode_status ? "all episodes" : cfg.episode_status.replace("_", " ");
+  return `${days}, ${sort}, ${ep}, ${dl}`;
+}
+
+function _smartCriteria(config) {
+  const cfg = config || {};
+  const feedCount = Array.isArray(cfg.feed_ids) ? cfg.feed_ids.length : 0;
+  return [
+    ["Podcasts", feedCount ? `${feedCount} selected` : "All podcasts"],
+    ["Release date", cfg.release_days == null ? "Any date" : `Last ${cfg.release_days} days`],
+    ["Order", cfg.sort === "asc" ? "Oldest first" : "Newest first"],
+    ["Episode status", cfg.episode_status === "all" || !cfg.episode_status ? "All" : cfg.episode_status.replace("_", " ")],
+    ["Download status", cfg.download_status === "any" || !cfg.download_status ? "Any" : cfg.download_status],
+  ];
+}
+
+function _smartCriteriaHTML(config, opts = {}) {
+  const compact = opts.compact === true;
+  const chips = _smartCriteria(config).map(([label, value]) => `
+    <span style="display:inline-flex;gap:4px;align-items:center;border:1px solid var(--border);border-radius:999px;padding:${compact ? "2px 7px" : "4px 9px"};font-size:${compact ? "11px" : "12px"};color:var(--text-2);background:var(--surface-1)">
+      <span style="color:var(--text-3);font-weight:600">${escHTML(label)}:</span>
+      <span>${escHTML(value)}</span>
+    </span>`).join("");
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:${compact ? "8px" : "10px"}">${chips}</div>`;
 }
 
 async function _playPlaylist(id) {
@@ -136,16 +205,19 @@ async function viewPlaylistDetail(playlistId) {
 
   const typeLabel = pl.type === "feed"
     ? `Feed playlist · ${pl.filter === "unplayed" ? "Unplayed only" : "All episodes"}`
-    : "Custom playlist";
+    : pl.type === "smart" ? `Smart list · ${_smartSummary(pl.smart_config)}` : "Custom playlist";
   const countLabel = `${episodes.length} episode${episodes.length !== 1 ? "s" : ""}`;
 
-  const listIconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="36" height="36">
-    <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
-    <circle cx="3.5" cy="6" r="1.5" fill="currentColor" stroke="none"/>
-    <circle cx="3.5" cy="12" r="1.5" fill="currentColor" stroke="none"/>
-    <circle cx="3.5" cy="18" r="1.5" fill="currentColor" stroke="none"/>
-  </svg>`;
+  const listIconSvg = _playlistIconSvg(pl, 36);
   const playSvg = `<svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+  const smartCriteriaPanel = pl.type === "smart" ? `
+    <div style="margin:14px 0 6px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <div style="font-size:13px;font-weight:700;color:var(--text-1)">${_playlistBadgeHTML(pl)} Filter criteria</div>
+        <button class="btn btn-ghost btn-sm" id="pl-edit-filters-btn">Edit filters</button>
+      </div>
+      ${_smartCriteriaHTML(pl.smart_config)}
+    </div>` : "";
 
   el.innerHTML = `
     <div class="page pl-detail-page">
@@ -156,9 +228,10 @@ async function viewPlaylistDetail(playlistId) {
       <div class="pl-detail-header">
         <div class="pl-detail-art">${listIconSvg}</div>
         <div class="pl-detail-info">
-          <div class="pl-detail-title">${escHTML(pl.name)}</div>
+          <div class="pl-detail-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">${escHTML(pl.name)} ${_playlistBadgeHTML(pl)}</div>
           ${pl.description ? `<div class="pl-detail-desc">${escHTML(pl.description)}</div>` : ""}
           <div class="pl-detail-meta-line" id="pl-count-line">${typeLabel} · ${countLabel}</div>
+          ${smartCriteriaPanel}
           <div class="pl-detail-actions">
             <button class="btn btn-primary btn-sm" id="pl-play-btn">${playSvg} Play</button>
             <button class="btn btn-ghost btn-sm" id="pl-edit-btn">Edit</button>
@@ -176,7 +249,10 @@ async function viewPlaylistDetail(playlistId) {
 
   document.getElementById("pl-play-btn").addEventListener("click", () => _playPlaylist(pl.id));
   document.getElementById("pl-edit-btn").addEventListener("click", () => {
-    _showEditDialog(pl.id, pl.name, pl.description || "", () => Router.navigate(`/playlists/${pl.id}`));
+    _showEditDialog(pl, () => Router.navigate(`/playlists/${pl.id}`));
+  });
+  document.getElementById("pl-edit-filters-btn")?.addEventListener("click", () => {
+    _showEditDialog(pl, () => Router.navigate(`/playlists/${pl.id}`));
   });
 
   // Drag-to-reorder (custom playlists only)
@@ -296,7 +372,12 @@ async function _deletePlaylist(id, name) {
   } catch (e) { Toast.error(e.message); }
 }
 
-function _playlistFormHTML(name = "", desc = "") {
+function _playlistFormHTML(pl = {}, feeds = []) {
+  const name = pl.name || "";
+  const desc = pl.description || "";
+  const type = pl.type || "custom";
+  const config = pl.smart_config || { feed_ids: [], release_days: 90, sort: "desc", episode_status: "all", download_status: "any" };
+  const feedIds = new Set(config.feed_ids || []);
   return `
     <div style="display:flex;flex-direction:column;gap:16px">
       <div class="form-group">
@@ -309,6 +390,50 @@ function _playlistFormHTML(name = "", desc = "") {
         <textarea id="pl-desc" class="form-control" rows="3" placeholder="What's in this playlist?"
                   maxlength="5000" style="resize:vertical">${escHTML(desc)}</textarea>
       </div>
+      <div class="form-group">
+        <label class="form-label">Type</label>
+        <select id="pl-type" class="form-control" ${pl.id ? "disabled" : ""}>
+          <option value="custom" ${type === "custom" ? "selected" : ""}>Custom playlist</option>
+          <option value="smart" ${type === "smart" ? "selected" : ""}>Smart list</option>
+        </select>
+      </div>
+      <div id="pl-smart-fields" style="display:${type === "smart" ? "flex" : "none"};flex-direction:column;gap:16px">
+        <div class="form-group">
+          <label class="form-label">Podcasts</label>
+          <select id="pl-smart-feeds" class="form-control" multiple size="${Math.min(Math.max(feeds.length, 3), 8)}">
+            ${feeds.map((feed) => `<option value="${feed.id}" ${feedIds.has(feed.id) ? "selected" : ""}>${escHTML(feed.title || feed.url)}</option>`).join("")}
+          </select>
+          <div style="font-size:12px;color:var(--text-3);margin-top:4px">Leave empty to include all podcasts.</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
+          <div class="form-group">
+            <label class="form-label">Release window</label>
+            <input id="pl-smart-days" class="form-control" type="number" min="0" max="36500" value="${config.release_days ?? ""}" placeholder="Any date">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sort</label>
+            <select id="pl-smart-sort" class="form-control">
+              <option value="desc" ${config.sort !== "asc" ? "selected" : ""}>Newest first</option>
+              <option value="asc" ${config.sort === "asc" ? "selected" : ""}>Oldest first</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Episode status</label>
+            <select id="pl-smart-episode-status" class="form-control">
+              <option value="all" ${config.episode_status === "all" ? "selected" : ""}>All</option>
+              <option value="unplayed" ${config.episode_status === "unplayed" ? "selected" : ""}>Unplayed</option>
+              <option value="played" ${config.episode_status === "played" ? "selected" : ""}>Played</option>
+              <option value="in_progress" ${config.episode_status === "in_progress" ? "selected" : ""}>In progress</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Download status</label>
+            <select id="pl-smart-download-status" class="form-control">
+              ${["downloaded", "any", "pending", "queued", "downloading", "failed", "skipped"].map((status) => `<option value="${status}" ${config.download_status === status ? "selected" : ""}>${status}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="modal-actions" style="margin-top:20px">
       <button class="btn btn-ghost" id="pl-cancel">Cancel</button>
@@ -316,16 +441,33 @@ function _playlistFormHTML(name = "", desc = "") {
     </div>`;
 }
 
-function _showCreateDialog(addEpisodeId = null) {
-  Modal.open("New Playlist", _playlistFormHTML());
+function _smartConfigFromForm() {
+  return {
+    feed_ids: [...document.getElementById("pl-smart-feeds").selectedOptions].map((opt) => Number(opt.value)),
+    release_days: document.getElementById("pl-smart-days").value === "" ? null : Number(document.getElementById("pl-smart-days").value),
+    sort: document.getElementById("pl-smart-sort").value,
+    episode_status: document.getElementById("pl-smart-episode-status").value,
+    download_status: document.getElementById("pl-smart-download-status").value,
+  };
+}
+
+async function _showCreateDialog(addEpisodeId = null) {
+  const feeds = await API.getFeeds().catch(() => []);
+  Modal.open("New Playlist", _playlistFormHTML({}, feeds));
+  document.getElementById("pl-type").addEventListener("change", (e) => {
+    document.getElementById("pl-smart-fields").style.display = e.target.value === "smart" ? "flex" : "none";
+  });
   document.getElementById("pl-cancel").addEventListener("click", Modal.close);
   document.getElementById("pl-save").addEventListener("click", async () => {
     const name = document.getElementById("pl-name").value.trim();
     const desc = document.getElementById("pl-desc").value.trim();
+    const type = document.getElementById("pl-type").value;
     if (!name) { document.getElementById("pl-name").focus(); return; }
     try {
-      const pl = await API.createPlaylist({ name, description: desc || null, type: "custom" });
-      if (addEpisodeId != null) await API.addToPlaylist(pl.id, addEpisodeId);
+      const body = { name, description: desc || null, type };
+      if (type === "smart") body.smart_config = _smartConfigFromForm();
+      const pl = await API.createPlaylist(body);
+      if (addEpisodeId != null && type === "custom") await API.addToPlaylist(pl.id, addEpisodeId);
       Modal.close();
       Toast.success(addEpisodeId != null ? `Playlist created and episode added` : "Playlist created");
       await _loadPlaylists();
@@ -336,15 +478,18 @@ function _showCreateDialog(addEpisodeId = null) {
   });
 }
 
-function _showEditDialog(id, name, desc, onSuccess) {
-  Modal.open("Edit Playlist", _playlistFormHTML(name, desc));
+async function _showEditDialog(pl, onSuccess) {
+  const feeds = await API.getFeeds().catch(() => []);
+  Modal.open("Edit Playlist", _playlistFormHTML(pl, feeds));
   document.getElementById("pl-cancel").addEventListener("click", Modal.close);
   document.getElementById("pl-save").addEventListener("click", async () => {
     const newName = document.getElementById("pl-name").value.trim();
     const newDesc = document.getElementById("pl-desc").value.trim();
     if (!newName) { document.getElementById("pl-name").focus(); return; }
     try {
-      await API.updatePlaylist(id, { name: newName, description: newDesc || null });
+      const body = { name: newName, description: newDesc || null };
+      if (pl.type === "smart") body.smart_config = _smartConfigFromForm();
+      await API.updatePlaylist(pl.id, body);
       Modal.close();
       Toast.success("Playlist updated");
       if (typeof onSuccess === "function") {

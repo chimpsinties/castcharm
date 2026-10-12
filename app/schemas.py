@@ -261,6 +261,7 @@ class FeedUpdate(BaseModel):
     autoclean_enabled: Optional[bool] = None
     autoclean_mode: Optional[str] = Field(default=None, max_length=32)
     autoclean_exclude: Optional[bool] = None
+    auto_delete_played: Optional[bool] = None
     # 'newest' (default) or 'oldest' = listen in order (story / serial).
     play_order: Optional[str] = None
     # Not a Feed column. Set only after the user has been shown the
@@ -333,6 +334,7 @@ class FeedOut(BaseModel):
     autoclean_enabled: bool = False
     autoclean_mode: Optional[str] = None
     autoclean_exclude: bool = False
+    auto_delete_played: bool = False
     play_order: str = "oldest"
     # Only filled by GET /api/feeds/{id} for play_order == 'oldest'.
     next_up: Optional[NextUpOut] = None
@@ -402,15 +404,17 @@ class PlaylistCreate(BaseModel):
     # request. Same reasoning as SetImageBody in app/routers/episodes.py.
     name: str = Field(max_length=500)
     description: Optional[str] = Field(default=None, max_length=5000)
-    type: str = Field(default="custom", max_length=32)   # 'feed' | 'custom'
+    type: str = Field(default="custom", max_length=32)   # 'feed' | 'custom' | 'smart'
     feed_id: Optional[int] = None
     filter: str = Field(default="unplayed", max_length=32)  # 'all' | 'unplayed'
+    smart_config: Optional[dict] = None
 
 
 class PlaylistUpdate(BaseModel):
     name: Optional[str] = Field(default=None, max_length=500)
     description: Optional[str] = Field(default=None, max_length=5000)
     filter: Optional[str] = Field(default=None, max_length=32)
+    smart_config: Optional[dict] = None
 
 
 class PlaylistEpisodeOut(BaseModel):
@@ -429,6 +433,8 @@ class PlaylistOut(BaseModel):
     type: str
     feed_id: Optional[int] = None
     filter: str
+    smart_config: Optional[dict] = None
+    smart_key: Optional[str] = None
     created_at: datetime
     episode_count: int = 0
 
