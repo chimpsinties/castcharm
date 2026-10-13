@@ -46,3 +46,42 @@ def test_limits_endpoint_matches_constants(client):
         "max_search_len": limits.MAX_SEARCH_LEN,
         "max_request_bytes": limits.MAX_REQUEST_BYTES,
     }
+
+
+def test_auto_delete_played_global_default_and_feed_override(client, tmp_path):
+    settings = client.put("/api/settings", json={"download_path": str(tmp_path / "downloads")})
+    assert settings.status_code == 200, settings.text
+
+    first_response = client.post("/api/feeds/manual", json={"title": "Auto Delete Global Test A"})
+    second_response = client.post("/api/feeds/manual", json={"title": "Auto Delete Global Test B"})
+    assert first_response.status_code in (200, 201), first_response.text
+    assert second_response.status_code in (200, 201), second_response.text
+    first_feed = first_response.json()["id"]
+    second_feed = second_response.json()["id"]
+
+    assert client.get(f"/api/feeds/{first_feed}").json()["auto_delete_played"] is False
+
+    settings = client.put("/api/settings", json={"auto_delete_played": True})
+    assert settings.status_code == 200, settings.text
+    assert settings.json()["auto_delete_played"] is True
+
+    inherited = client.get(f"/api/feeds/{first_feed}").json()
+    assert inherited["auto_delete_played"] is True
+    assert inherited["auto_delete_played_override"] is None
+
+    overridden = client.put(
+        f"/api/feeds/{first_feed}",
+        json={"auto_delete_played_override": False},
+    )
+    assert overridden.status_code == 200, overridden.text
+    assert overridden.json()["auto_delete_played"] is False
+    assert overridden.json()["auto_delete_played_override"] is False
+    assert client.get(f"/api/feeds/{second_feed}").json()["auto_delete_played"] is True
+
+    inherited_again = client.put(
+        f"/api/feeds/{first_feed}",
+        json={"auto_delete_played_override": None},
+    )
+    assert inherited_again.status_code == 200, inherited_again.text
+    assert inherited_again.json()["auto_delete_played"] is True
+    assert inherited_again.json()["auto_delete_played_override"] is None

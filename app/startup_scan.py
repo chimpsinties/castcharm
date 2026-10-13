@@ -99,6 +99,10 @@ def scan_orphan_folders(db) -> int:
                 val = meta.get(attr)
                 if val is not None:
                     setattr(new_feed, attr, val)
+            override = meta.get("auto_delete_played_override")
+            if override is None and meta.get("auto_delete_played"):
+                override = True
+            new_feed.auto_delete_played_override = override
 
         db.add(new_feed)
         db.commit()

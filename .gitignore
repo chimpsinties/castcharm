@@ -28,6 +28,7 @@ htmlcov/
 # Runtime data — these are volume-mounted in Docker, not committed
 data/
 downloads/
+downloads-*/
 
 # Editors / OS
 .DS_Store

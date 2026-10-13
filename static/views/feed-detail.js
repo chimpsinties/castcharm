@@ -816,8 +816,15 @@ async function viewFeedDetail(feedId) {
             ${toggle("Listen in chronological order", "play_order_oldest", feed.play_order === "oldest",
               "For stories and serials. Play resumes where you left off, or starts at the oldest episode you haven't heard, and continues in order. Off: Play starts with the newest episode.")}
 
-            ${toggle("Delete played episodes automatically", "auto_delete_played", feed.auto_delete_played ?? false,
-              "When an episode is marked played, delete its downloaded server file. The Android app also removes its local copy after it learns this feed setting.")}
+            <div class="form-group">
+              <label class="form-label" for="auto-delete-played-override">Delete local copy when played</label>
+              <select class="form-control" id="auto-delete-played-override" name="auto_delete_played_override" style="max-width:320px">
+                <option value="inherit" ${feed.auto_delete_played_override == null ? "selected" : ""}>Use system default (${settings.auto_delete_played ? "On" : "Off"})</option>
+                <option value="on" ${feed.auto_delete_played_override === true ? "selected" : ""}>Always on for this podcast</option>
+                <option value="off" ${feed.auto_delete_played_override === false ? "selected" : ""}>Always off for this podcast</option>
+              </select>
+              <div class="form-hint">Deletes only the Android app's local copy. The server copy remains for scheduled auto-cleanup.</div>
+            </div>
 
             <div class="form-group">
               <label class="form-label">Auto-cleanup</label>
@@ -1743,7 +1750,8 @@ async function viewFeedDetail(feedId) {
       save_xml: raw.save_xml ?? false,
       auto_download_new: raw.auto_download_new ?? true,
       play_order: raw.play_order_oldest ? "oldest" : "newest",
-      auto_delete_played: raw.auto_delete_played ?? false,
+      auto_delete_played_override: raw.auto_delete_played_override === "on"
+        ? true : raw.auto_delete_played_override === "off" ? false : null,
       episode_number_start: raw.episode_number_start ? Number(raw.episode_number_start) : 1,
     };
     if (raw.download_path) payload.download_path = raw.download_path;

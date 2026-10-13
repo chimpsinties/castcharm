@@ -18,6 +18,7 @@ class GlobalSettingsBase(BaseModel):
     save_xml: bool = True
     max_concurrent_downloads: int = 2
     auto_download_new: bool = True
+    auto_delete_played: bool = False
     default_id3_mapping: dict[str, str] = {}
     log_max_entries: int = 1000
     episode_page_size: Optional[int] = 10000
@@ -70,6 +71,7 @@ class GlobalSettingsUpdate(BaseModel):
         default=None, ge=1, le=MAX_CONCURRENT_DOWNLOADS
     )
     auto_download_new: Optional[bool] = None
+    auto_delete_played: Optional[bool] = None
     default_id3_mapping: Optional[dict[str, str]] = None
     # Backs an in-memory ring buffer that is held for the life of the process.
     log_max_entries: Optional[int] = Field(default=None, ge=10, le=50_000)
@@ -261,7 +263,9 @@ class FeedUpdate(BaseModel):
     autoclean_enabled: Optional[bool] = None
     autoclean_mode: Optional[str] = Field(default=None, max_length=32)
     autoclean_exclude: Optional[bool] = None
+    # Legacy clients can still send auto_delete_played to set an explicit override.
     auto_delete_played: Optional[bool] = None
+    auto_delete_played_override: Optional[bool] = None
     # 'newest' (default) or 'oldest' = listen in order (story / serial).
     play_order: Optional[str] = None
     # Not a Feed column. Set only after the user has been shown the
@@ -335,6 +339,7 @@ class FeedOut(BaseModel):
     autoclean_mode: Optional[str] = None
     autoclean_exclude: bool = False
     auto_delete_played: bool = False
+    auto_delete_played_override: Optional[bool] = None
     play_order: str = "oldest"
     # Only filled by GET /api/feeds/{id} for play_order == 'oldest'.
     next_up: Optional[NextUpOut] = None

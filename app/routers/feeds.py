@@ -217,6 +217,17 @@ def _feed_out(feed: Feed, db: Session, counts: dict | None = None) -> FeedOut:
         counts = _merge_counts(feed.id, sub_ids, raw)
 
     data = FeedOut.model_validate(feed)
+    data.auto_delete_played_override = feed.auto_delete_played_override
+    if feed.auto_delete_played_override is not None:
+        data.auto_delete_played = feed.auto_delete_played_override
+    else:
+        from app.models import GlobalSettings
+        if "auto_delete_played_default" not in db.info:
+            global_settings = db.query(GlobalSettings).first()
+            db.info["auto_delete_played_default"] = bool(
+                global_settings.auto_delete_played if global_settings else False
+            )
+        data.auto_delete_played = db.info["auto_delete_played_default"]
     from app.routers.player import effective_play_order
     data.play_order = effective_play_order(feed, db)
     data.episode_count            = counts["episode_count"]
@@ -502,6 +513,9 @@ def update_feed(feed_id: int, body: FeedUpdate, background_tasks: BackgroundTask
         raise HTTPException(status_code=404, detail="Feed not found")
 
     updates = body.model_dump(exclude_unset=True)
+    if "auto_delete_played" in updates:
+        legacy_value = updates.pop("auto_delete_played")
+        updates.setdefault("auto_delete_played_override", legacy_value)
     # Not a column on Feed — must come out before the setattr loop below, which would
     # otherwise try to assign it to the model.
     allow_existing_folder = bool(updates.pop("allow_existing_folder", False))

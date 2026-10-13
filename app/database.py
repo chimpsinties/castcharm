@@ -125,6 +125,8 @@ def _migrate_db():
         ("feeds",           "autoclean_mode",                "VARCHAR"),
         ("feeds",           "autoclean_exclude",             "BOOLEAN DEFAULT 0"),
         ("feeds",           "auto_delete_played",            "BOOLEAN DEFAULT 0"),
+        ("feeds",           "auto_delete_played_override",   "BOOLEAN"),
+        ("global_settings", "auto_delete_played",            "BOOLEAN DEFAULT 0"),
         ("feeds",           "play_order",                    "VARCHAR"),
         ("global_settings", "sync_lookback_limit",           "INTEGER DEFAULT 50"),
         ("episodes",        "imported",                      "BOOLEAN DEFAULT 0"),
@@ -183,6 +185,7 @@ def _migrate_db():
             conn.execute(text(stmt))
         conn.commit()
 
+        migrate_legacy_auto_delete = False
         for table, column, col_def in migrations:
             existing = {
                 row[1]
@@ -191,6 +194,17 @@ def _migrate_db():
             if column not in existing:
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_def}"))
                 conn.commit()
+                if table == "feeds" and column == "auto_delete_played_override":
+                    migrate_legacy_auto_delete = True
+
+        if migrate_legacy_auto_delete:
+            # Older false values were the default, so only preserve enabled feeds
+            # as explicit overrides; old defaults should inherit the new global value.
+            conn.execute(text(
+                "UPDATE feeds SET auto_delete_played_override = 1 "
+                "WHERE auto_delete_played = 1"
+            ))
+            conn.commit()
 
         # Indexes introduced after initial schema — IF NOT EXISTS makes these idempotent.
         #

@@ -98,6 +98,31 @@ def test_set_played_is_idempotent_and_toggle_still_toggles(client):
     assert client.post(url).json()["played"] is True
 
 
+@pytest.mark.parametrize("mark_method", ["single", "bulk"])
+def test_auto_delete_played_keeps_server_file_until_scheduled_cleanup(client, tmp_path, mark_method):
+    fid, ids = _feed_with_episodes(client, "oldest", n=1)
+    file_path = tmp_path / f"{mark_method}.mp3"
+    file_path.write_bytes(b"server episode")
+
+    db = _session()
+    try:
+        feed = db.get(Feed, fid)
+        episode = db.get(Episode, ids[0])
+        feed.auto_delete_played = True
+        episode.file_path = str(file_path)
+        db.commit()
+    finally:
+        db.close()
+
+    if mark_method == "single":
+        response = client.post(f"/api/episodes/{ids[0]}/played", json={"played": True})
+    else:
+        response = client.post("/api/episodes/bulk", json={"episode_ids": ids, "action": "mark_played"})
+
+    assert response.status_code == 200, response.text
+    assert file_path.exists()
+
+
 def test_next_up_absent_for_newest_first_and_when_caught_up(client):
     fid, ids = _feed_with_episodes(client, "newest")
     assert client.get(f"/api/feeds/{fid}").json()["next_up"] is None

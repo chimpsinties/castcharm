@@ -220,6 +220,9 @@ async function viewSettings() {
             ${toggle("Listen to new podcasts in chronological order", "default_play_order_oldest",
               (settings.default_play_order || "oldest") === "oldest",
               "How Play behaves on any podcast you haven't set individually. On: start at the oldest episode and continue in order, like a story. Off: start with the newest episode. Each podcast can override this in its own settings.")}
+            ${toggle("Delete local copy when played by default", "auto_delete_played",
+              settings.auto_delete_played ?? false,
+              "Delete the Android app's local download after an episode is played. Applies to all podcasts unless a podcast overrides it.")}
           </div>
         </div>
 
@@ -690,6 +693,7 @@ async function viewSettings() {
       organize_by_year: raw.organize_by_year ?? false,
       save_xml: raw.save_xml ?? false,
       auto_download_new: raw.auto_download_new ?? true,
+      auto_delete_played: raw.auto_delete_played ?? false,
       default_play_order: raw.default_play_order_oldest ? "oldest" : "newest",
       // Notification fields ride along only when login is on (the panel is
       // not rendered otherwise, so raw has none of them). The URL and token

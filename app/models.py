@@ -20,6 +20,8 @@ class GlobalSettings(Base):
     save_xml = Column(Boolean, default=True)
     max_concurrent_downloads = Column(Integer, default=2)
     auto_download_new = Column(Boolean, default=True)
+    # Default for deleting the phone's local episode copy when played.
+    auto_delete_played = Column(Boolean, default=False)
     # Default ID3 mapping used when a feed enables ID3 but has no custom mapping
     default_id3_mapping = Column(JSON, default=dict)
     # How many log entries to keep in the in-memory ring buffer
@@ -168,8 +170,10 @@ class Feed(Base):
     autoclean_mode = Column(String, nullable=True)  # "recent" | "unplayed"; None = inherit global
     # When True, this feed is skipped by the global scheduled autoclean job
     autoclean_exclude = Column(Boolean, default=False, nullable=True)
-    # When True, marking an episode played deletes its server-side audio file.
+    # Legacy field retained for migration and old API clients.
     auto_delete_played = Column(Boolean, default=False, nullable=True)
+    # None inherits GlobalSettings.auto_delete_played; true/false explicitly override it.
+    auto_delete_played_override = Column(Boolean, nullable=True)
 
     # How "Play" treats this feed.  None/'newest' = start with the newest
     # unplayed episode (ordinary podcast).  'oldest' = listen in order: resume

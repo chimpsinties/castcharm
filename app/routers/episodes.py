@@ -820,8 +820,6 @@ def toggle_played(episode_id: int, body: PlayedBody | None = None, db: Session =
         if ep.duration:
             from app.routers.stats import _parse_seconds
             ep.play_position_seconds = _parse_seconds(ep.duration)
-        if ep.feed and ep.feed.auto_delete_played:
-            _delete_episode_file(ep)
     else:
         ep.play_position_seconds = 0
     db.commit()
@@ -990,8 +988,6 @@ def bulk_action(body: BulkBody, db: Session = Depends(get_db)):
         for ep in episodes:
             ep.played = True
             ep.last_played_at = datetime.utcnow()
-            if ep.feed and ep.feed.auto_delete_played:
-                _delete_episode_file(ep)
             affected += 1
         db.commit()
 
